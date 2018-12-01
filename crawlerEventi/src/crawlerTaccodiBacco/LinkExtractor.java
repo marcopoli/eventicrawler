@@ -32,6 +32,12 @@ public class LinkExtractor {
 
 	public static void getLinks(String startDat, String endDat) throws ParseException, IOException, SQLException{
 		Connection connDb = null;
+
+		//DEBUG_CODE
+        int newLinks = 0;
+		int oldLinks = 0;
+        int totalLinks = 0;
+
 		try
 	    {
 	    	Class.forName("org.postgresql.Driver");
@@ -60,9 +66,9 @@ public class LinkExtractor {
 		
 		
 			 String link = "https://iltaccodibacco.it/puglia/eventi/"+formatter.format(date)+"//";
-			
+
+
 			 URL url = new URL(link);
-	
 			 URLConnection conn = url.openConnection();
 			 conn.setRequestProperty("User-Agent","Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.95 Safari/537.36");
 			 conn.setRequestProperty("Accept","text/html");
@@ -85,14 +91,16 @@ public class LinkExtractor {
 		    	 String linkPage = blocco.childNode(1).childNode(1).attr("href");
 		    	 String titolo = blocco.childNode(1).childNode(1).childNode(0).outerHtml();
 		    	 if(!linkPage.equals(" ") && !linkPage.equals("") ){
-		    		 
 		    		 String check = "SELECT * from links where data_ev = ? AND link =? AND titolo = ?";
 		    		 PreparedStatement st1 = connDb.prepareStatement(check);
 			    	 st1.setDate(1, new java.sql.Date(date.getTime()));
 			    	 st1.setString(2, linkPage);
 			    	 st1.setString(3, titolo);
 			    	 ResultSet rs = st1.executeQuery();
-		    		 
+
+                     //DEBUG_CODE
+                     oldLinks++;
+
 			    	 if(!rs.next()){
 				    	 String q = "INSERT INTO links(data_ev,link,titolo) VALUES (?,?,?)";
 				    	 PreparedStatement st = connDb.prepareStatement(q);
@@ -100,14 +108,25 @@ public class LinkExtractor {
 				    	 st.setString(2, linkPage);
 				    	 st.setString(3, titolo);
 				    	 st.execute();
+
+                         //DEBUG_CODE
+                         newLinks++;
+
 			    	 }
-			    	 
-			    	 
+
+                     //DEBUG_CODE
+                     totalLinks++;
 		    	 }
 		     }
-		     
-	        
+
 		}
+
+		//DEBUG_CODE
+        oldLinks = oldLinks - newLinks;
+        System.out.println("New links inserted: " + newLinks);
+        System.out.println("Links already in db: " + oldLinks);
+        System.out.println("TOTAL links found: " + totalLinks);
+
 		connDb.close();
 	}
 	
@@ -121,6 +140,10 @@ public class LinkExtractor {
 		String startDat = formmat1.format(ldt.minusDays(7));
 		
 		String endDat = formmat1.format(ldt.plusMonths(6));
+
+
+		//DEBUG_CODE
+		System.out.println("LinkExtractor.java: finding event from " + startDat + " to " + endDat + " ...");
 		
 		try {
 			getLinks(startDat, endDat);
