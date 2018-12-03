@@ -86,8 +86,9 @@ public class MeteoExtractor {
 				 String nomeMese = iniziale.toUpperCase() + finale.toLowerCase();
 
 				 //METEO_CODE
+                 String idComune = getIstatDb(comune,a,connDb);
 				 int idMeteo = checkMeteoDb(idComune, a, connDb);
-				 if (idMeteo != -1){
+				 if (idMeteo != -1 && idComune != null){
 				     AddMeteoEvento(link,rs0.getString("titolo"),a,rs0.getInt("autoid"),idMeteo,connDb);
                  }
 				 else {
@@ -247,11 +248,10 @@ public class MeteoExtractor {
 
 
 
-    //Controlla che il comune abbia un codice istat e controlla se il meteo per la città e data selezionata sia già stato estratto
-    //se non è stato ancora estratto, restituisce -1, altrimenti restituisce l'id del meteo trovato.
-	public static int checkMeteoDb(String comune, Date data, Connection connDb) throws Exception{
-        int idMeteoFound = -1;
-        String istat;
+	//Controlla che il comune abbia un codice istat
+    public static String getIstatDb(String comune, Date data, Connection connDb) throws Exception {
+        String istatComuneFound = null;
+
         try {
 
             //Controlla codice istat partendo da nome comune
@@ -260,18 +260,34 @@ public class MeteoExtractor {
             statement.setString(1, comune);
             ResultSet rs = statement.executeQuery();
 
-            if(!rs.next()){ throw new Exception("Codice istat del comune " + comune + " non trovato.");}
-            else{istat = rs.getString("istat");}
-            System.out.println("codice istat di " + comune + ": " + istat);
+            if (!rs.next()) {
+                throw new Exception("Codice istat del comune " + comune + " non trovato.");
+            } else {
+                istatComuneFound = rs.getString("istat");
+            }
+            System.out.println("codice istat di " + comune + ": " + istatComuneFound);
+        }catch(Exception e) {error = true; e.printStackTrace();}
+
+
+        return istatComuneFound;
+    }
+
+
+    //Controlla se il meteo per la città e data selezionata sia già stato estratto
+    //se non è stato ancora estratto, restituisce -1, altrimenti restituisce l'id del meteo trovato.
+	public static int checkMeteoDb(String idComune, Date data, Connection connDb) throws Exception{
+        int idMeteoFound = -1;
+        String istat;
+        try {
 
             //Controlla se è presente gia' il meteo per comune e data selezionata
             String checkMeteo = "SELECT autoid from meteo_2 where idcomune = ? AND data = ?";
             PreparedStatement statement2 = connDb.prepareStatement(checkMeteo);
-            statement2.setString(1, istat);
+            statement2.setString(1, idComune);
             statement2.setDate(2, new java.sql.Date(data.getTime()));
             ResultSet rs2 = statement2.executeQuery();
 
-            if(!rs2.next()){System.out.println("Meteo per " + istat + " non trovato.");}
+            if(!rs2.next()){System.out.println("Meteo per " + idComune + " non trovato.");}
             else{idMeteoFound = rs2.getInt("autoid");}
 
         }catch(Exception e) {error = true; e.printStackTrace();}
