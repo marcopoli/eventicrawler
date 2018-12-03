@@ -86,13 +86,13 @@ public class MeteoExtractor {
 				 String nomeMese = iniziale.toUpperCase() + finale.toLowerCase();
 
 				 //METEO_CODE
-				 int idMeteo = checkMeteoDb(comune, a, connDb);
+				 int idMeteo = checkMeteoDb(idComune, a, connDb);
 				 if (idMeteo != -1){
 				     AddMeteoEvento(link,rs0.getString("titolo"),a,rs0.getInt("autoid"),idMeteo,connDb);
                  }
 				 else {
                      String linkMeteo = "https://www.ilmeteo.it/portale/archivio-meteo/" + URLEncoder.encode(comune) + "/" + (a.getYear() + 1900) + "/" + nomeMese + "/" + a.getDate();
-                     //getMeteoData(linkMeteo,link,rs0.getString("titolo"), a, connDb);
+                     getMeteoData(linkMeteo,idComune, a, connDb);
                  }
 			 }else {
 			 
@@ -124,7 +124,8 @@ public class MeteoExtractor {
 		System.out.println("Number of meteo calls: " + callsCount);
 	}
 	
-	public static void getMeteoData(String linkMeteo, String linkEvento, String titolo, Date dataevento, Connection connDb) throws Exception  {
+	//public static void getMeteoData(String linkMeteo, String linkEvento, String titolo, Date dataevento, Connection connDb) throws Exception  {
+    public static void getMeteoData(String linkMeteo,String idComune, Date dataevento, Connection connDb) throws Exception  {
 		 try {
 			 URL url = new URL(linkMeteo);
 				System.out.println(linkMeteo);
@@ -208,36 +209,32 @@ public class MeteoExtractor {
 			}
 		     
 			//Inserisci nel db
-	    	 String check = "SELECT * from meteo where link =? AND titolo = ? AND dataevento = ?";
+	    	 String check = "SELECT * from meteo_2 where idcomune = ? AND data = ?";
 	    	 PreparedStatement st1 = connDb.prepareStatement(check);
-	    	 st1.setString(1, linkEvento);
-	    	 st1.setString(2, titolo);
-	    	 st1.setDate(3, new java.sql.Date(dataevento.getTime()));
+	    	 st1.setString(1, idComune);
+	    	 st1.setDate(2, new java.sql.Date(dataevento.getTime()));
 	    	 ResultSet rs = st1.executeQuery();
 	    	
 	    	 if(!rs.next()){
 			
-	    		 String q = "INSERT INTO meteo(link,titolo,dataevento,primavera,estate,autunno,inverno,sereno,coperto,poco_nuvoloso,pioggia,temporale,nebbia,neve,temperatura,velocita_vento) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+	    		 String q = "INSERT INTO meteo_2(idcomune,data,primavera,estate,autunno,inverno,sereno,coperto,poco_nuvoloso,pioggia,temporale,nebbia,neve,temperatura,velocita_vento) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 	    		 PreparedStatement st2 = connDb.prepareStatement(q);
-		    	 st2.setString(1, linkEvento);
-		    	 st2.setString(2, titolo);
-		    	 st2.setDate(3, new java.sql.Date(dataevento.getTime()));
-		    	 st2.setInt(4, primavera);
-		    	 st2.setInt(5, estate);
-		    	 st2.setInt(6, autunno);
-		    	 st2.setInt(7, inverno);
-		    	 st2.setInt(8, sereno);
-		    	 st2.setInt(9, coperto);
-		    	 st2.setInt(10, poco_nuv);
-		    	 st2.setInt(11, pioggia);
-		    	 st2.setInt(12, temporale);
-		    	 st2.setInt(13, nebbia);
-		    	 st2.setInt(14, neve);
-		    	 st2.setInt(15, tempMedia);
-		    	 st2.setInt(16, ventoMedio);
+		    	 st2.setString(1, idComune);
+		    	 st2.setDate(2, new java.sql.Date(dataevento.getTime()));
+		    	 st2.setInt(3, primavera);
+		    	 st2.setInt(4, estate);
+		    	 st2.setInt(5, autunno);
+		    	 st2.setInt(6, inverno);
+		    	 st2.setInt(7, sereno);
+		    	 st2.setInt(8, coperto);
+		    	 st2.setInt(9, poco_nuv);
+		    	 st2.setInt(10, pioggia);
+		    	 st2.setInt(11, temporale);
+		    	 st2.setInt(12, nebbia);
+		    	 st2.setInt(13, neve);
+		    	 st2.setInt(14, tempMedia);
+		    	 st2.setInt(15, ventoMedio);
 		    	 st2.execute();
-		    	 
-		    	
 	    	 }
 			
 	     
