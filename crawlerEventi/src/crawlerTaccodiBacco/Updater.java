@@ -42,7 +42,7 @@ public class Updater {
         System.out.println("Updater.java: processing w2v ...");
 
 		Core.eventsTow2v();
-		//MeteoExtractor.extractPastMeteoData();//<- Sistemare i duplicati e cercare una nuova fonte. ???
+		MeteoExtractor.extractPastMeteoData();//<- Sistemare i duplicati e cercare una nuova fonte. ???
 		//PrevisioniExtractor.extract7days();
 		//Converter.eventiTovec();
 
