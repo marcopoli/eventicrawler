@@ -150,13 +150,17 @@ public class MeteoExtractor {
                 System.out.println("Processed events: " + eventsProcessed + " ...");
                 System.out.println("Number of weather calls made: " + callsCount + " ...");
             }
+            //-----------------
+
             //Thread.sleep(5000);
 		}
 		connDb.close();
+        //DEBUG_CODE
         System.out.println("TOTAL number of events processed: " + eventsProcessed);
 		System.out.println("TOTAL number of weather calls: " + callsCount);
         System.out.println("TOTAL number of weather errors detected: " + errorsFound);
         System.out.println("TOTAL number of istat code errors detected: " + istatErrorsFound);
+        //---------------------
 	}
 	
 	//public static void getMeteoData(String linkMeteo, String linkEvento, String titolo, Date dataevento, Connection connDb) throws Exception  {
