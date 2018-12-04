@@ -32,7 +32,7 @@ import org.jsoup.select.Elements;
 public class EventExtractor {
 	
 	public static void eventExtract() throws ParseException, IOException, SQLException{
-		Connection connDb = null;
+	    Connection connDb = null;
 		try
 	    {
 	    	Class.forName("org.postgresql.Driver");
@@ -49,15 +49,26 @@ public class EventExtractor {
 		String query = "SELECT * from links where extracted = 0";
 		Statement st0 = connDb.createStatement();
 		ResultSet rs0 = st0.executeQuery(query);
-		
-		
-		
+
+
+		//DEBUG_CODE -------------------------
+		String queryCount = "SELECT COUNT(*) from links where extracted = 0";
+        Statement stCount = connDb.createStatement();
+        ResultSet rsCount = stCount.executeQuery(queryCount);
+        rsCount.next();
+        System.out.println("EventExtractor.java: extracting " + rsCount.getString(1) +" links ...");
+        int newExtractedEvents = 0;
+        int oldExtractedEvents = 0;
+        int failedExtractedEvents = 0;
+        int totalExtractedEvents = 0;
+        //-----------------------------------------
+
 
 		while(rs0.next()) {
 		    // Do your job here with `date`.
 		    //System.out.println(date);
 			 String link = rs0.getString("link");
-			System.out.println(link);
+			//System.out.println(link);
 			 URL url = new URL(link);
 	
 			 URLConnection conn = url.openConnection();
@@ -302,7 +313,11 @@ public class EventExtractor {
 	    	 st1.setString(1, link);
 	    	 st1.setString(2, titolo);
 	    	 ResultSet rs = st1.executeQuery();
-    		 System.out.println(link);
+    		 //System.out.println(link);
+
+             //DEBUG_CODE
+             oldExtractedEvents++;
+
 	    	 if(!rs.next()){
 	    		 String q = "INSERT INTO eventi (link,titolo,posto_link,posto_nome,data_da,data_a,comune,free_entry,arte,avventura,cinema,cittadinanza,musica_classica,geek,bambini,folklore,cultura,jazz,concerti,teatro,vita_notturna,featured,descrizione,popolarita,contenuto_html) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 	    		 PreparedStatement st = connDb.prepareStatement(q);
@@ -339,15 +354,39 @@ public class EventExtractor {
 	    		 PreparedStatement st2 = connDb.prepareStatement(up);
 	    		 st2.setString(1, link);
 	    		 st2.execute();
-	    	 }
+
+                 //DEBUG_CODE
+                 newExtractedEvents++;
+             }
 	    	 
 		     }catch(Exception e) {
 		    	 String up = "UPDATE links SET extracted = -1 where link = ?";
 	    		 PreparedStatement st2 = connDb.prepareStatement(up);
 	    		 st2.setString(1, link);
 	    		 st2.execute();
+
+	    		 //DEBUG_CODE
+                 failedExtractedEvents++;
+
 		     }
+
+		    //DEBUG_CODE
+            totalExtractedEvents++;
+		    if((totalExtractedEvents % 250) == 0) {
+                System.out.println("Processed events: " + totalExtractedEvents + " ...");
+            }
+
+
 		}
+
+		//DEBUG_CODE--------------------
+        oldExtractedEvents = oldExtractedEvents - newExtractedEvents;
+        System.out.println("TOTAL New events extracted: " + newExtractedEvents);
+        System.out.println("TOTAL Events already extracted: " + oldExtractedEvents);
+        System.out.println("TOTAL Failed to extract Events: " + failedExtractedEvents);
+        System.out.println("TOTAL LINKS PROCESSED: " + totalExtractedEvents);
+        //-----------------------------
+
 		connDb.close();
 	}
 	

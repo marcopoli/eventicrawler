@@ -23,6 +23,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
+import java.util.NoSuchElementException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -51,12 +52,24 @@ public class MeteoExtractor {
 		LocalDateTime date = LocalDateTime.now();
 		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ENGLISH);
 		String query = "SELECT * from eventi where meteo_bool = 0 AND data_a < '"+formatter.format(date)+"' ";
-		System.out.println(query);
+		//System.out.println(query);
 		Statement st0 = connDb.createStatement();
 		ResultSet rs0 = st0.executeQuery(query);
+
+
+        //DEBUG_CODE -------------------------
+        String queryCount = "SELECT COUNT(*) from eventi where meteo_bool = 0 AND data_a < '"+formatter.format(date)+"' ";
+        Statement stCount = connDb.createStatement();
+        ResultSet rsCount = stCount.executeQuery(queryCount);
+        rsCount.next();
+        System.out.println("MeteoExtractor.java: extracting weather for " + rsCount.getString(1) +" events ...");
+        int callsCount = 0;
+        int eventsProcessed = 0;
+        int errorsFound = 0;
+        int istatErrorsFound = 0;
+        //-----------------------------------------
 		
 		//Check meteo passato
-		
 
 		while(rs0.next()) {
 			error = false;
@@ -72,33 +85,50 @@ public class MeteoExtractor {
 			 start.setTime(da);
 			 Calendar end = Calendar.getInstance();
 			 end.setTime(a);
-			 System.out.println(da);
-			 System.out.println(a);
+			 //System.out.println(da);
+			 //System.out.println(a);
 			 String comune = rs0.getString("comune");
-			 
+
+			 //METEO_CODE
+			 String idComune = getIstatDb(comune,connDb);
+			 if (idComune == null){istatErrorsFound++;}
+			 //--------------
+
 			 if(start.equals(end)) {
 				 String mese = getMonth(a.getMonth());
 				 String iniziale = mese.substring(0, 1);
 				 String finale = mese.substring(1, mese.length());
 				 String nomeMese = iniziale.toUpperCase() + finale.toLowerCase();
-				 			 
-				 
-				 String linkMeteo = "https://www.ilmeteo.it/portale/archivio-meteo/"+URLEncoder.encode(comune)+"/"+(a.getYear()+1900)+"/"+nomeMese+"/"+a.getDate();
-				
-				 getMeteoData(linkMeteo,link,rs0.getString("titolo"), a, connDb);
+
+				 //METEO_CODE
+				 int idMeteo = checkMeteoDb(idComune, a, connDb);
+				 if (idMeteo == -1 && idComune != null){
+                     String linkMeteo = "https://www.ilmeteo.it/portale/archivio-meteo/" + URLEncoder.encode(comune) + "/" + (a.getYear() + 1900) + "/" + nomeMese + "/" + a.getDate();
+                     getMeteoData(linkMeteo,idComune, comune, a, connDb);
+                     idMeteo = checkMeteoDb(idComune, a, connDb);
+                     callsCount++;
+                     Thread.sleep(1000);
+                 }
+				 //Aggiungi riga in meteo_eventi solo se non ci sono errori
+                 if (idMeteo != -1){AddMeteoEvento(link,rs0.getString("titolo"),a,rs0.getInt("autoid"),idMeteo,connDb);}
 			 }else {
-			 
 				 for (Date dat = start.getTime(); start.before(end); start.add(Calendar.DATE, 1), dat = start.getTime()) {
 					 String mese = getMonth(dat.getMonth());
 					 String iniziale = mese.substring(0, 1);
 					 String finale = mese.substring(1, mese.length());
 					 String nomeMese = iniziale.toUpperCase() + finale.toLowerCase();
-					
-					 
-					 
-					 String linkMeteo = "https://www.ilmeteo.it/portale/archivio-meteo/"+URLEncoder.encode(comune)+"/"+(dat.getYear()+1900)+"/"+nomeMese+"/"+dat.getDate();
-					 getMeteoData(linkMeteo,link,rs0.getString("titolo"), dat, connDb);
-					 Thread.sleep(100);
+
+					 //METEO_CODE
+                     int idMeteo = checkMeteoDb(idComune, dat, connDb);
+                     if (idMeteo == -1){
+                         String linkMeteo = "https://www.ilmeteo.it/portale/archivio-meteo/" + URLEncoder.encode(comune) + "/" + (dat.getYear() + 1900) + "/" + nomeMese + "/" + dat.getDate();
+                         getMeteoData(linkMeteo,idComune, comune, dat, connDb);
+                         idMeteo = checkMeteoDb(idComune, dat, connDb);
+                         callsCount++;
+                         Thread.sleep(1000);
+                     }
+                     //Aggiungi riga in meteo_eventi solo se non ci sono errori
+                     if (idMeteo != -1){AddMeteoEvento(link,rs0.getString("titolo"),dat,rs0.getInt("autoid"),idMeteo,connDb);}
 				 }
 			 }
 			 if(error!= true) {
@@ -111,16 +141,33 @@ public class MeteoExtractor {
 	    		 PreparedStatement st3 = connDb.prepareStatement(up);
 	    		 st3.setString(1, link);
 	    		 st3.execute();
+	    		 errorsFound++;
 			 }
-			 Thread.sleep(5000);
+
+			//DEBUG_CODE
+            eventsProcessed++;
+            if((eventsProcessed % 100) == 0) {
+                System.out.println("Processed events: " + eventsProcessed + " ...");
+                System.out.println("Number of weather calls made: " + callsCount + " ...");
+            }
+            //-----------------
+
+            //Thread.sleep(5000);
 		}
 		connDb.close();
+        //DEBUG_CODE
+        System.out.println("TOTAL number of events processed: " + eventsProcessed);
+		System.out.println("TOTAL number of weather calls: " + callsCount);
+        System.out.println("TOTAL number of weather errors detected: " + errorsFound);
+        System.out.println("TOTAL number of istat code errors detected: " + istatErrorsFound);
+        //---------------------
 	}
 	
-	public static void getMeteoData(String linkMeteo, String linkEvento, String titolo, Date dataevento, Connection connDb) throws Exception  {
+	//public static void getMeteoData(String linkMeteo, String linkEvento, String titolo, Date dataevento, Connection connDb) throws Exception  {
+    public static void getMeteoData(String linkMeteo,String idComune, String comune, Date dataevento, Connection connDb) throws Exception  {
 		 try {
 			 URL url = new URL(linkMeteo);
-				System.out.println(linkMeteo);
+				//System.out.println(linkMeteo);
 			 URLConnection conn = url.openConnection();
 			 conn.setRequestProperty("User-Agent","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36");
 			 conn.setRequestProperty("Accept","text/html");
@@ -201,19 +248,18 @@ public class MeteoExtractor {
 			}
 		     
 			//Inserisci nel db
-	    	 String check = "SELECT * from meteo where link =? AND titolo = ? AND dataevento = ?";
+	    	 String check = "SELECT * from meteo_comuni where idcomune = ? AND data = ?";
 	    	 PreparedStatement st1 = connDb.prepareStatement(check);
-	    	 st1.setString(1, linkEvento);
-	    	 st1.setString(2, titolo);
-	    	 st1.setDate(3, new java.sql.Date(dataevento.getTime()));
+	    	 st1.setString(1, idComune);
+	    	 st1.setDate(2, new java.sql.Date(dataevento.getTime()));
 	    	 ResultSet rs = st1.executeQuery();
 	    	
 	    	 if(!rs.next()){
 			
-	    		 String q = "INSERT INTO meteo(link,titolo,dataevento,primavera,estate,autunno,inverno,sereno,coperto,poco_nuvoloso,pioggia,temporale,nebbia,neve,temperatura,velocita_vento) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+	    		 String q = "INSERT INTO meteo_comuni(idcomune,comune,data,primavera,estate,autunno,inverno,sereno,coperto,poco_nuvoloso,pioggia,temporale,nebbia,neve,temperatura,velocita_vento) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 	    		 PreparedStatement st2 = connDb.prepareStatement(q);
-		    	 st2.setString(1, linkEvento);
-		    	 st2.setString(2, titolo);
+		    	 st2.setString(1, idComune);
+                 st2.setString(2, comune);
 		    	 st2.setDate(3, new java.sql.Date(dataevento.getTime()));
 		    	 st2.setInt(4, primavera);
 		    	 st2.setInt(5, estate);
@@ -229,16 +275,88 @@ public class MeteoExtractor {
 		    	 st2.setInt(15, tempMedia);
 		    	 st2.setInt(16, ventoMedio);
 		    	 st2.execute();
-		    	 
-		    	
 	    	 }
 			
 	     
-		 }catch(Exception e) {error = true; e.printStackTrace();}
+		 }catch(NumberFormatException e){error = true; System.out.println("NumberFormatException: Skipping weather for " + comune + "(" + idComune + ") on " + dataevento + " ...");}
+		 catch(Exception e) {error = true; e.printStackTrace();}
 	}
-	
+
+
+
 	public static String getMonth(int month) {
 	    return new DateFormatSymbols(Locale.ITALIAN).getMonths()[month];
 	}
+
+
+
+	//Controlla che il comune abbia un codice istat
+    public static String getIstatDb(String comune, Connection connDb) throws NoSuchElementException,Exception {
+        String istatComuneFound = null;
+
+        try {
+
+            //Controlla codice istat partendo da nome comune
+            String checkIstat = "SELECT istat from comuni where comune = ?";
+            PreparedStatement statement = connDb.prepareStatement(checkIstat);
+            statement.setString(1, comune);
+            ResultSet rs = statement.executeQuery();
+
+            if (!rs.next()) {
+                throw new NoSuchElementException();
+            } else {
+                istatComuneFound = rs.getString("istat");
+            }
+        }catch(NoSuchElementException e){error = true; System.out.println("NoSuchElementException: Istat code of " + comune + " not found");}
+        catch(Exception e) {error = true; e.printStackTrace();}
+
+        return istatComuneFound;
+    }
+
+
+    //Controlla se il meteo per la città e data selezionata sia già stato estratto
+    //se non è stato ancora estratto, restituisce -1, altrimenti restituisce l'id del meteo trovato.
+	public static int checkMeteoDb(String idComune, Date data, Connection connDb) throws Exception{
+        int idMeteoFound = -1;
+        try {
+            //Controlla se è presente gia' il meteo per comune e data selezionata
+            String checkMeteo = "SELECT autoid from meteo_comuni where idcomune = ? AND data = ?";
+            PreparedStatement statement2 = connDb.prepareStatement(checkMeteo);
+            statement2.setString(1, idComune);
+            statement2.setDate(2, new java.sql.Date(data.getTime()));
+            ResultSet rs2 = statement2.executeQuery();
+
+            if(rs2.next()){idMeteoFound = rs2.getInt("autoid");}
+
+        }catch(Exception e) {error = true; e.printStackTrace();}
+        return idMeteoFound;
+    }
+
+
+    //Aggiunge l'id del meteo per l'evento selezionato nella tabella meteo_eventi
+    public static void AddMeteoEvento(String link, String titolo,  Date data, int idEvento, int idMeteo, Connection connDb) throws Exception{
+	    try{
+        //Inserisci il meteo per l'evento nella tabella meteo_eventi
+        String check = "SELECT * from meteo_eventi where link =? AND titolo = ? AND dataevento = ?";
+        PreparedStatement st1 = connDb.prepareStatement(check);
+        st1.setString(1, link);
+        st1.setString(2, titolo);
+        st1.setDate(3, new java.sql.Date(data.getTime()));
+        ResultSet rs = st1.executeQuery();
+
+        if(!rs.next()) {
+            String insert = "INSERT INTO meteo_eventi(link,titolo,dataevento,idevento,idmeteo) VALUES (?,?,?,?,?)";
+            PreparedStatement st2 = connDb.prepareStatement(insert);
+            st2.setString(1, link);
+            st2.setString(2, titolo);
+            st2.setDate(3, new java.sql.Date(data.getTime()));
+            st2.setInt(4, idEvento);
+            st2.setInt(5, idMeteo);
+            st2.execute();
+        }
+        }catch(Exception e) {error = true; e.printStackTrace();}
+    }
+
 	
 }
+

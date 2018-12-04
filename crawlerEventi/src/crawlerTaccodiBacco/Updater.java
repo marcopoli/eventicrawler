@@ -31,15 +31,26 @@ public class Updater {
 		ResultSet rs0 = st0.executeQuery(query);
 		rs0.next();
 		Date last_up = rs0.getDate("last_update");
-		
+
+		//DEBUG_CODE
+		System.out.println("Updater.java: last update found: " + last_up.toString());
+
 		LinkExtractor.updateLinks(last_up);
 		EventExtractor.eventExtract();
+
+        //DEBUG_CODE
+        System.out.println("Updater.java: processing w2v ...");
+
 		Core.eventsTow2v();
-		//MeteoExtractor.extractPastMeteoData();//<- Sistemare i duplicati e cercare una nuova fonte. ???
+		MeteoExtractor.extractPastMeteoData();//<- Sistemare i duplicati e cercare una nuova fonte. ???
 		//PrevisioniExtractor.extract7days();
 		//Converter.eventiTovec();
-		
-		
+
+        //DEBUG_CODE
+        System.out.println("Updater.java: w2v done");
+
+
+
 		//Save new update date to DB
 		String up = "UPDATE control set last_update = ?";
 		LocalDateTime ldt = LocalDateTime.now();
@@ -47,6 +58,9 @@ public class Updater {
 		pt.setDate(1, java.sql.Date.valueOf(ldt.toLocalDate()));
 		pt.execute();
 		connDb.close();
+
+        //DEBUG_CODE
+        System.out.println("Updater.java: db saved and closed");
 		
 	}
 }
